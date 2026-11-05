@@ -9,7 +9,7 @@ import { createFarm, FARM_TYPES, type CreateFarmInput } from '@/lib/farms/farms'
 import { toErrorKey, type ErrorKey } from '@/lib/errors';
 import { isValidEmail, isValidPhone } from '@/lib/validation';
 
-type CreateFarmFormProps = { onCreated: () => void; onCancel?: () => void };
+type CreateFarmFormProps = { onCreated: (farmId: string) => void; onCancel?: () => void };
 
 const EMPTY_INPUT: CreateFarmInput = {
   name: '',
@@ -45,9 +45,9 @@ export function CreateFarmForm({ onCreated, onCancel }: CreateFarmFormProps) {
 
     setPending(true);
     try {
-      await createFarm(input);
+      const farmId = await createFarm(input);
       setInput(EMPTY_INPUT);
-      onCreated();
+      onCreated(farmId);
     } catch (cause) {
       setFormError(toErrorKey(cause));
     } finally {

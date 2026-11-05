@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Notice } from '@/components/ui/Notice';
@@ -12,6 +13,7 @@ import { FarmCard } from './FarmCard';
 
 export function DashboardView() {
   const t = useAppText();
+  const router = useRouter();
   const { user } = useAuth();
   const [farms, setFarms] = useState<MyFarm[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -33,9 +35,9 @@ export function DashboardView() {
     void refresh();
   }, [refresh]);
 
-  const handleCreated = () => {
+  const handleCreated = (farmId: string) => {
     setCreating(false);
-    void refresh();
+    router.push(`/farms/${farmId}`);
   };
 
   const showCreateForm = creating || (farms !== null && farms.length === 0);
