@@ -6,6 +6,11 @@ import { useAuth } from '@/lib/auth/AuthProvider';
 
 type AuthNavProps = { variant: 'desktop' | 'mobile'; onDark?: boolean; onNavigate?: () => void };
 
+const PILL_BASE =
+  'inline-flex shrink-0 items-center whitespace-nowrap rounded-full border px-3 py-2 text-xs font-semibold transition-colors duration-200 sm:px-5 sm:py-2.5 sm:text-sm';
+const PRIMARY_PILL =
+  'inline-flex shrink-0 items-center whitespace-nowrap rounded-full bg-brand-forest-700 px-3 py-2 text-xs font-semibold text-white transition-colors duration-200 hover:bg-brand-forest-800 sm:px-5 sm:py-2.5 sm:text-sm';
+
 export function AuthNav({ variant, onDark = false, onNavigate }: AuthNavProps) {
   const t = useAppText();
   const { user, loading, signOut } = useAuth();
@@ -48,15 +53,14 @@ export function AuthNav({ variant, onDark = false, onNavigate }: AuthNavProps) {
   const outlineClass = onDark
     ? 'border-white/50 text-white hover:bg-white/10'
     : 'border-brand-forest-200 text-brand-forest-900 hover:bg-brand-forest-50';
-  const pillBase = 'inline-flex items-center rounded-full border px-5 py-2.5 text-sm font-semibold transition-colors duration-200';
 
   if (!user) {
     return (
-      <div className="hidden items-center gap-3 md:flex">
-        <Link href="/login" className={`${pillBase} ${outlineClass}`}>
+      <div className="flex items-center gap-2 sm:gap-3">
+        <Link href="/login" className={`${PILL_BASE} ${outlineClass}`}>
           {t.nav.login}
         </Link>
-        <Link href="/signup" className="inline-flex items-center rounded-full bg-brand-forest-700 px-5 py-2.5 text-sm font-semibold text-white transition-colors duration-200 hover:bg-brand-forest-800">
+        <Link href="/signup" className={PRIMARY_PILL}>
           {t.nav.signup}
         </Link>
       </div>
@@ -64,17 +68,20 @@ export function AuthNav({ variant, onDark = false, onNavigate }: AuthNavProps) {
   }
 
   return (
-    <div className="hidden items-center gap-3 md:flex">
-      <span className={`max-w-[10rem] truncate text-sm font-semibold ${onDark ? 'text-white' : 'text-brand-forest-900'}`} title={displayName(user)}>
+    <div className="flex items-center gap-2 sm:gap-3">
+      <span
+        className={`hidden max-w-[10rem] truncate text-sm font-semibold lg:block ${onDark ? 'text-white' : 'text-brand-forest-900'}`}
+        title={displayName(user)}
+      >
         {displayName(user)}
       </span>
-      <Link href="/dashboard" className={`${pillBase} ${outlineClass}`}>
+      <Link href="/dashboard" className={`${PILL_BASE} ${outlineClass}`}>
         {t.nav.dashboard}
       </Link>
       <button
         type="button"
         onClick={() => void handleSignOut()}
-        className={`rounded-full px-3 py-2 text-sm font-medium transition-colors duration-200 ${onDark ? 'text-white/85 hover:text-brand-gold-400' : 'text-brand-forest-700 hover:text-brand-forest-900'}`}
+        className={`shrink-0 whitespace-nowrap rounded-full px-2 py-2 text-xs font-medium transition-colors duration-200 sm:px-3 sm:text-sm ${onDark ? 'text-white/85 hover:text-brand-gold-400' : 'text-brand-forest-700 hover:text-brand-forest-900'}`}
       >
         {t.nav.signOut}
       </button>
