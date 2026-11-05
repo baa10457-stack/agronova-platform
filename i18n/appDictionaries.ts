@@ -183,6 +183,13 @@ const en = {
     colStatus: 'Status',
     empty: 'No farm on the platform yet.',
   },
+  nav: {
+    login: 'Sign in',
+    signup: 'Create account',
+    account: 'Signed in as',
+    dashboard: 'Dashboard',
+    signOut: 'Sign out',
+  },
 };
 
 export type AppDictionary = typeof en;
@@ -369,6 +376,13 @@ const fr: AppDictionary = {
     colCreated: 'Créée le',
     colStatus: 'Statut',
     empty: 'Aucune exploitation sur la plateforme pour le moment.',
+  },
+  nav: {
+    login: 'Connexion',
+    signup: 'Créer un compte',
+    account: 'Connecté en tant que',
+    dashboard: 'Tableau de bord',
+    signOut: 'Déconnexion',
   },
 };
 

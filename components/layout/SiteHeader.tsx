@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Container } from '@/components/ui/Container';
+import { AuthNav } from '@/components/layout/AuthNav';
 import { LanguageSwitcher } from '@/components/layout/LanguageSwitcher';
 import { Logo } from '@/components/layout/Logo';
 import { getNavLinks } from '@/components/layout/navLinks';
@@ -55,6 +56,7 @@ export function SiteHeader({ t }: SiteHeaderProps) {
 
           <div className="flex items-center gap-4">
             <LanguageSwitcher onDark={!solid} />
+            <AuthNav variant="desktop" onDark={!solid} />
             <Link
               href="#modules"
               className="hidden rounded-full bg-brand-gold-500 px-5 py-2.5 text-sm font-semibold text-brand-forest-900 transition-colors duration-200 hover:bg-brand-gold-400 md:inline-flex"
@@ -100,6 +102,7 @@ export function SiteHeader({ t }: SiteHeaderProps) {
               >
                 {t.cta}
               </Link>
+              <AuthNav variant="mobile" onNavigate={closeMenu} />
             </nav>
           </Container>
         </div>

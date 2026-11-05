@@ -1,10 +1,10 @@
 import { LandingPage } from '@/components/landing/LandingPage';
-import { LanguageProvider } from '@/i18n/LanguageProvider';
+import { AppProviders } from '@/components/app/AppProviders';
 
 export default function HomePage() {
   return (
-    <LanguageProvider>
+    <AppProviders>
       <LandingPage />
-    </LanguageProvider>
+    </AppProviders>
   );
 }
