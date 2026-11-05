@@ -5,13 +5,23 @@ import { Button } from '@/components/ui/Button';
 import { FormField, fieldClassName } from '@/components/ui/FormField';
 import { Notice } from '@/components/ui/Notice';
 import { useAppText } from '@/i18n/useAppText';
-import { createFarm, type CreateFarmInput } from '@/lib/farms/farms';
+import { createFarm, FARM_TYPES, type CreateFarmInput } from '@/lib/farms/farms';
 import { toErrorKey, type ErrorKey } from '@/lib/errors';
 import { isValidEmail, isValidPhone } from '@/lib/validation';
 
 type CreateFarmFormProps = { onCreated: () => void; onCancel?: () => void };
 
-const EMPTY_INPUT: CreateFarmInput = { name: '', address: '', location: '', phone: '', email: '', description: '' };
+const EMPTY_INPUT: CreateFarmInput = {
+  name: '',
+  farmType: 'mixed',
+  responsibleName: '',
+  phone: '',
+  address: '',
+  city: '',
+  region: '',
+  email: '',
+  description: '',
+};
 
 export function CreateFarmForm({ onCreated, onCancel }: CreateFarmFormProps) {
   const t = useAppText();
@@ -26,6 +36,7 @@ export function CreateFarmForm({ onCreated, onCancel }: CreateFarmFormProps) {
     event.preventDefault();
     const nextErrors: typeof errors = {};
     if (input.name.trim().length < 2) nextErrors.name = t.validation.nameShort;
+    if (input.responsibleName.trim().length < 2) nextErrors.responsibleName = t.validation.nameShort;
     if (input.email.trim() !== '' && !isValidEmail(input.email)) nextErrors.email = t.validation.emailInvalid;
     if (!isValidPhone(input.phone)) nextErrors.phone = t.validation.phoneInvalid;
     setErrors(nextErrors);
@@ -49,9 +60,28 @@ export function CreateFarmForm({ onCreated, onCancel }: CreateFarmFormProps) {
       {formError && <Notice tone="error">{t.common.error[formError]}</Notice>}
       <div className="grid gap-5 md:grid-cols-2">
         <FormField id="farm-name" label={t.dashboard.name} value={input.name} onChange={(e) => update('name')(e.target.value)} error={errors.name} />
-        <FormField id="farm-address" label={t.dashboard.address} value={input.address} onChange={(e) => update('address')(e.target.value)} />
-        <FormField id="farm-location" label={t.dashboard.location} value={input.location} onChange={(e) => update('location')(e.target.value)} />
+        <div className="flex flex-col gap-2">
+          <label htmlFor="farm-type" className="text-sm font-medium text-brand-forest-900">
+            {t.dashboard.farmType}
+          </label>
+          <select
+            id="farm-type"
+            value={input.farmType}
+            onChange={(e) => setInput((current) => ({ ...current, farmType: e.target.value as CreateFarmInput['farmType'] }))}
+            className={`${fieldClassName} border-brand-forest-200`}
+          >
+            {FARM_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {t.dashboard.farmTypes[type]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <FormField id="farm-responsible" label={t.dashboard.responsibleName} value={input.responsibleName} onChange={(e) => update('responsibleName')(e.target.value)} error={errors.responsibleName} />
         <FormField id="farm-phone" label={t.dashboard.phone} type="tel" value={input.phone} onChange={(e) => update('phone')(e.target.value)} error={errors.phone} />
+        <FormField id="farm-address" label={t.dashboard.address} value={input.address} onChange={(e) => update('address')(e.target.value)} />
+        <FormField id="farm-city" label={t.dashboard.city} value={input.city} onChange={(e) => update('city')(e.target.value)} />
+        <FormField id="farm-region" label={t.dashboard.region} value={input.region} onChange={(e) => update('region')(e.target.value)} />
         <FormField id="farm-email" label={t.dashboard.email} type="email" value={input.email} onChange={(e) => update('email')(e.target.value)} error={errors.email} />
       </div>
       <div className="flex flex-col gap-2">

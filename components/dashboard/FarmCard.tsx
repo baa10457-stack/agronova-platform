@@ -43,8 +43,11 @@ export function FarmCard({ entry }: FarmCardProps) {
         )}
       </header>
       <dl className="flex flex-col gap-4">
+        <DetailRow label={t.dashboard.farmType} value={t.dashboard.farmTypes[farm.farm_type]} />
+        <DetailRow label={t.dashboard.responsibleName} value={farm.responsible_name} />
         <DetailRow label={t.dashboard.address} value={farm.address} />
-        <DetailRow label={t.dashboard.location} value={farm.location} />
+        <DetailRow label={t.dashboard.city} value={farm.city} />
+        <DetailRow label={t.dashboard.region} value={farm.region} />
         <DetailRow label={t.dashboard.phone} value={farm.phone} />
         <DetailRow label={t.dashboard.email} value={farm.email} />
         <DetailRow label={t.dashboard.description} value={farm.description} />
