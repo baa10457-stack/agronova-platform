@@ -43,6 +43,20 @@ export async function fetchMyRole(farmId: string, userId: string): Promise<FarmR
   return role && FARM_ROLES.includes(role) ? (role as FarmRole) : null;
 }
 
+export async function fetchMyPermissions(farmId: string, userId: string): Promise<Permission[]> {
+  const { data, error } = await createSupabaseBrowserClient()
+    .from('membership_permissions')
+    .select('permission, farm_memberships!inner(farm_id, user_id)')
+    .eq('farm_memberships.farm_id', farmId)
+    .eq('farm_memberships.user_id', userId)
+    .eq('granted', true);
+  if (error) throw error;
+  return asRecords(data).flatMap((row) => {
+    const permission = asString(row.permission);
+    return permission && (PERMISSIONS as readonly string[]).includes(permission) ? [permission as Permission] : [];
+  });
+}
+
 export async function fetchFarmMembers(farmId: string): Promise<FarmMember[]> {
   const supabase = createSupabaseBrowserClient();
 

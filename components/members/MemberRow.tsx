@@ -2,7 +2,7 @@ import { useAppText } from '@/i18n/useAppText';
 import type { FarmMember } from '@/lib/farms/members';
 import { Button } from '@/components/ui/Button';
 
-type MemberRowProps = { member: FarmMember; isSelf: boolean; onManage: () => void };
+type MemberRowProps = { member: FarmMember; isSelf: boolean; onManage?: () => void };
 
 export function MemberRow({ member, isSelf, onManage }: MemberRowProps) {
   const t = useAppText();
@@ -18,7 +18,7 @@ export function MemberRow({ member, isSelf, onManage }: MemberRowProps) {
       <td className="px-6 py-4 text-stone-700">{t.roles[member.role]}</td>
       <td className="px-6 py-4 text-stone-700">{joined}</td>
       <td className="px-6 py-4">
-        {member.role === 'owner' ? (
+        {member.role === 'owner' || !onManage ? (
           <span className="text-stone-400">-</span>
         ) : (
           <Button variant="secondary" onClick={onManage} className="px-4 py-2">

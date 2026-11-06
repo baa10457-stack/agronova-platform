@@ -7,7 +7,15 @@ import { useAppText } from '@/i18n/useAppText';
 import { useAuth } from '@/lib/auth/AuthProvider';
 import { toErrorKey } from '@/lib/errors';
 import { fetchFarm, type Farm, type FarmRole } from '@/lib/farms/farms';
-import { fetchFarmMembers, fetchInvitations, fetchMyRole, type FarmMember, type Invitation } from '@/lib/farms/members';
+import {
+  fetchFarmMembers,
+  fetchInvitations,
+  fetchMyPermissions,
+  fetchMyRole,
+  type FarmMember,
+  type Invitation,
+  type Permission,
+} from '@/lib/farms/members';
 import { InvitationsPanel } from './InvitationsPanel';
 import { InviteMemberForm } from './InviteMemberForm';
 import { MemberRow } from './MemberRow';
@@ -17,29 +25,33 @@ type MembersViewProps = { farmId: string };
 
 export function MembersView({ farmId }: MembersViewProps) {
   const t = useAppText();
-  const { user } = useAuth();
+  const { user, isPlatformAdmin } = useAuth();
   const userId = user?.id ?? null;
   const [farm, setFarm] = useState<Farm | null>(null);
   const [myRole, setMyRole] = useState<FarmRole | null | undefined>(undefined);
+  const [myPermissions, setMyPermissions] = useState<Permission[]>([]);
   const [members, setMembers] = useState<FarmMember[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = members.find((m) => m.membershipId === selectedId) ?? null;
 
-  const canManage = myRole === 'owner' || myRole === 'admin';
+  const canManage = isPlatformAdmin || myRole === 'owner' || myRole === 'admin';
+  const canInvite = canManage || myPermissions.includes('members.manage');
 
   const refresh = useCallback(async () => {
     if (!userId) return;
     try {
-      const [farmData, role, memberList, invitationList] = await Promise.all([
+      const [farmData, role, permissions, memberList, invitationList] = await Promise.all([
         fetchFarm(farmId),
         fetchMyRole(farmId, userId),
+        fetchMyPermissions(farmId, userId),
         fetchFarmMembers(farmId),
         fetchInvitations(farmId),
       ]);
       setFarm(farmData);
       setMyRole(role);
+      setMyPermissions(permissions);
       setMembers(memberList);
       setInvitations(invitationList);
       setLoadError(null);
@@ -56,7 +68,7 @@ export function MembersView({ farmId }: MembersViewProps) {
     return <p className="text-sm text-stone-600">{t.common.loading}</p>;
   }
 
-  if (!canManage) {
+  if (!canInvite) {
     return (
       <div className="flex flex-col gap-6">
         <Notice tone="error">{t.members.noAccess}</Notice>
@@ -95,7 +107,7 @@ export function MembersView({ farmId }: MembersViewProps) {
                 key={member.membershipId}
                 member={member}
                 isSelf={member.userId === userId}
-                onManage={() => setSelectedId(member.membershipId)}
+                onManage={canManage ? () => setSelectedId(member.membershipId) : undefined}
               />
             ))}
           </tbody>
@@ -104,14 +116,14 @@ export function MembersView({ farmId }: MembersViewProps) {
       </section>
 
       <div className="grid gap-10 lg:grid-cols-2">
-        <InviteMemberForm farmId={farmId} isOwner={myRole === 'owner'} onInvited={refresh} />
+        <InviteMemberForm farmId={farmId} isOwner={isPlatformAdmin || myRole === 'owner'} onInvited={refresh} />
         <InvitationsPanel invitations={invitations} onRevoked={refresh} />
       </div>
 
-      {selected && (
+      {selected && canManage && (
         <MemberSettingsDialog
           member={selected}
-          viewerRole={myRole ?? 'employee'}
+          viewerRole={isPlatformAdmin ? 'owner' : (myRole ?? 'employee')}
           isSelf={selected.userId === userId}
           onClose={() => setSelectedId(null)}
           onChanged={refresh}

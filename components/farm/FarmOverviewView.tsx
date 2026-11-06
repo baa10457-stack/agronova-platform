@@ -6,17 +6,17 @@ import { DetailRow } from '@/components/ui/DetailRow';
 import { Notice } from '@/components/ui/Notice';
 import { useAppText } from '@/i18n/useAppText';
 import { useAuth } from '@/lib/auth/AuthProvider';
-import { fetchMyFarms, type MyFarm } from '@/lib/farms/farms';
+import { fetchFarm, fetchMyFarms, type Farm, type FarmRole } from '@/lib/farms/farms';
 import { fetchFarmActivity, fetchFarmMemberCount, type FarmActivity } from '@/lib/farms/overview';
 import { toErrorKey } from '@/lib/errors';
 
 type FarmOverviewViewProps = { farmId: string };
 
-type OverviewData = { entry: MyFarm; memberCount: number; activity: FarmActivity[] };
+type OverviewData = { farm: Farm; role: FarmRole | null; memberCount: number; activity: FarmActivity[] };
 
 export function FarmOverviewView({ farmId }: FarmOverviewViewProps) {
   const t = useAppText();
-  const { user } = useAuth();
+  const { user, isPlatformAdmin } = useAuth();
   const [data, setData] = useState<OverviewData | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -30,7 +30,8 @@ export function FarmOverviewView({ farmId }: FarmOverviewViewProps) {
       try {
         const farms = await fetchMyFarms(userId);
         const entry = farms.find((item) => item.farm.id === farmId);
-        if (!entry) {
+        const farm = entry?.farm ?? (isPlatformAdmin ? await fetchFarm(farmId) : null);
+        if (!farm) {
           if (!cancelled) setNotFound(true);
           return;
         }
@@ -38,7 +39,7 @@ export function FarmOverviewView({ farmId }: FarmOverviewViewProps) {
           fetchFarmMemberCount(farmId),
           fetchFarmActivity(farmId),
         ]);
-        if (!cancelled) setData({ entry, memberCount, activity });
+        if (!cancelled) setData({ farm, role: entry?.role ?? null, memberCount, activity });
       } catch (cause) {
         if (!cancelled) setLoadError(t.common.error[toErrorKey(cause)]);
       }
@@ -46,7 +47,7 @@ export function FarmOverviewView({ farmId }: FarmOverviewViewProps) {
     return () => {
       cancelled = true;
     };
-  }, [userId, farmId, t]);
+  }, [userId, farmId, isPlatformAdmin, t]);
 
   if (notFound) {
     return (
@@ -63,9 +64,8 @@ export function FarmOverviewView({ farmId }: FarmOverviewViewProps) {
 
   if (!data) return <p className="text-sm text-stone-600">{t.common.loading}</p>;
 
-  const { entry, memberCount, activity } = data;
-  const { farm, role } = entry;
-  const canManageMembers = role === 'owner' || role === 'admin';
+  const { farm, role, memberCount, activity } = data;
+  const canManageMembers = isPlatformAdmin || role === 'owner' || role === 'admin';
   const createdOn = new Date(farm.created_at).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
 
   return (
@@ -78,9 +78,11 @@ export function FarmOverviewView({ farmId }: FarmOverviewViewProps) {
           <div className="flex flex-col gap-3">
             <h1 className="text-3xl font-semibold text-brand-forest-900">{farm.name}</h1>
             <div className="flex flex-wrap gap-2 text-xs font-semibold">
-              <span className="rounded-full bg-brand-forest-50 px-3 py-1 text-brand-forest-800">
-                {t.dashboard.yourRole}: {t.roles[role]}
-              </span>
+              {role && (
+                <span className="rounded-full bg-brand-forest-50 px-3 py-1 text-brand-forest-800">
+                  {t.dashboard.yourRole}: {t.roles[role]}
+                </span>
+              )}
               <span className="rounded-full bg-brand-gold-500/15 px-3 py-1 text-brand-forest-900">
                 {t.dashboard.status}: {t.statuses[farm.status]}
               </span>
