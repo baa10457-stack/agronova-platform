@@ -6,62 +6,37 @@ import { AnimalFormDialog } from '@/components/livestock/AnimalFormDialog';
 import { Button } from '@/components/ui/Button';
 import { Notice } from '@/components/ui/Notice';
 import { useAppText } from '@/i18n/useAppText';
-import { useAuth } from '@/lib/auth/AuthProvider';
-import { fetchFarm, fetchMembershipPermissions, fetchMyFarms, type Farm, type FarmRole } from '@/lib/farms/farms';
+import { useFarmAccess } from '@/lib/farms/useFarmAccess';
 import { deleteAnimal, fetchAnimals, type Animal } from '@/lib/livestock/animals';
 import { toErrorKey } from '@/lib/errors';
 
 type LivestockViewProps = { farmId: string };
 
-type Access = { farm: Farm; canManage: boolean };
-
 type Dialog = { mode: 'create' } | { mode: 'edit'; animal: Animal } | null;
 
 export function LivestockView({ farmId }: LivestockViewProps) {
   const t = useAppText();
-  const { user, isPlatformAdmin } = useAuth();
-  const [access, setAccess] = useState<Access | null>(null);
+  const access = useFarmAccess(farmId);
   const [animals, setAnimals] = useState<Animal[]>([]);
-  const [notFound, setNotFound] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [dialog, setDialog] = useState<Dialog>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const userId = user?.id;
+  const isReady = access.kind === 'ready';
 
   const loadAnimals = useCallback(async () => {
-    setAnimals(await fetchAnimals(farmId));
-  }, [farmId]);
+    try {
+      setAnimals(await fetchAnimals(farmId));
+      setLoadError(null);
+    } catch (cause) {
+      setLoadError(t.common.error[toErrorKey(cause)]);
+    }
+  }, [farmId, t]);
 
   useEffect(() => {
-    if (!userId) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const farms = await fetchMyFarms(userId);
-        const entry = farms.find((item) => item.farm.id === farmId);
-        const farm = entry?.farm ?? (isPlatformAdmin ? await fetchFarm(farmId) : null);
-        if (!farm) {
-          if (!cancelled) setNotFound(true);
-          return;
-        }
-        const permissions = entry ? await fetchMembershipPermissions(entry.membershipId) : [];
-        const role: FarmRole | null = entry?.role ?? null;
-        const canManage = isPlatformAdmin || role === 'owner' || role === 'admin' || permissions.includes('farm.manage');
-        const list = await fetchAnimals(farmId);
-        if (!cancelled) {
-          setAccess({ farm, canManage });
-          setAnimals(list);
-        }
-      } catch (cause) {
-        if (!cancelled) setLoadError(t.common.error[toErrorKey(cause)]);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [userId, farmId, isPlatformAdmin, t]);
+    if (isReady) void loadAnimals();
+  }, [isReady, loadAnimals]);
 
   const handleDelete = async (animal: Animal) => {
     setActionError(null);
@@ -74,7 +49,7 @@ export function LivestockView({ farmId }: LivestockViewProps) {
     }
   };
 
-  if (notFound) {
+  if (access.kind === 'notFound') {
     return (
       <div className="flex flex-col gap-4">
         <Notice tone="error">{t.overview.notFound}</Notice>
@@ -85,8 +60,9 @@ export function LivestockView({ farmId }: LivestockViewProps) {
     );
   }
 
+  if (access.kind === 'error') return <Notice tone="error">{t.common.error[toErrorKey(access.error)]}</Notice>;
   if (loadError) return <Notice tone="error">{loadError}</Notice>;
-  if (!access) return <p className="text-sm text-stone-600">{t.common.loading}</p>;
+  if (access.kind !== 'ready') return <p className="text-sm text-stone-600">{t.common.loading}</p>;
 
   const { farm, canManage } = access;
   const activeAnimals = animals.filter((animal) => animal.status === 'active');
