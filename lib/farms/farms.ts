@@ -88,6 +88,18 @@ export async function fetchMyFarms(userId: string): Promise<MyFarm[]> {
   });
 }
 
+export async function fetchMembershipPermissions(membershipId: string): Promise<string[]> {
+  const { data, error } = await createSupabaseBrowserClient()
+    .from('membership_permissions')
+    .select('permission, granted')
+    .eq('membership_id', membershipId);
+  if (error) throw error;
+  return asRecords(data).flatMap((row) => {
+    const permission = asString(row.permission);
+    return permission && row.granted === true ? [permission] : [];
+  });
+}
+
 export async function fetchFarm(farmId: string): Promise<Farm | null> {
   const { data, error } = await createSupabaseBrowserClient()
     .from('farms')

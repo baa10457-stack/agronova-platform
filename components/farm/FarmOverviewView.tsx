@@ -88,14 +88,22 @@ export function FarmOverviewView({ farmId }: FarmOverviewViewProps) {
               </span>
             </div>
           </div>
-          {canManageMembers && (
+          <div className="flex flex-wrap gap-3">
             <Link
-              href={`/farms/${farm.id}/members`}
-              className="rounded-full border border-brand-forest-200 px-5 py-2.5 text-sm font-semibold text-brand-forest-900 transition-colors duration-200 hover:bg-brand-forest-50"
+              href={`/farms/${farm.id}/livestock`}
+              className="rounded-full bg-brand-gold-500 px-5 py-2.5 text-sm font-semibold text-brand-forest-900 transition-colors duration-200 hover:bg-brand-gold-400"
             >
-              {t.dashboard.manageMembers}
+              {t.livestock.open}
             </Link>
-          )}
+            {canManageMembers && (
+              <Link
+                href={`/farms/${farm.id}/members`}
+                className="rounded-full border border-brand-forest-200 px-5 py-2.5 text-sm font-semibold text-brand-forest-900 transition-colors duration-200 hover:bg-brand-forest-50"
+              >
+                {t.dashboard.manageMembers}
+              </Link>
+            )}
+          </div>
         </div>
       </section>
 
