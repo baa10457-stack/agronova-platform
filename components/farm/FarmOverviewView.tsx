@@ -96,6 +96,12 @@ export function FarmOverviewView({ farmId }: FarmOverviewViewProps) {
               {t.livestock.open}
             </Link>
             <Link
+              href={`/farms/${farm.id}/crops`}
+              className="rounded-full bg-brand-gold-500 px-5 py-2.5 text-sm font-semibold text-brand-forest-900 transition-colors duration-200 hover:bg-brand-gold-400"
+            >
+              {t.crops.open}
+            </Link>
+            <Link
               href={`/farms/${farm.id}/milk`}
               className="rounded-full bg-brand-gold-500 px-5 py-2.5 text-sm font-semibold text-brand-forest-900 transition-colors duration-200 hover:bg-brand-gold-400"
             >
