@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FieldFormDialog } from '@/components/crops/FieldFormDialog';
+import { ParcelMap } from '@/components/crops/ParcelMap';
+import type { MapParcel } from '@/components/crops/LeafletParcelMap';
 import { SeasonFormDialog } from '@/components/crops/SeasonFormDialog';
 import { Button } from '@/components/ui/Button';
 import { Notice } from '@/components/ui/Notice';
@@ -61,6 +63,24 @@ export function CropsView({ farmId }: CropsViewProps) {
   }, [isReady, loadData]);
 
   const fieldNames = useMemo(() => new Map(fields.map((field) => [field.id, field.name])), [fields]);
+
+  const locatedParcels = useMemo<MapParcel[]>(
+    () =>
+      fields.flatMap((field) =>
+        field.latitude !== null && field.longitude !== null
+          ? [
+              {
+                id: field.id,
+                name: field.name,
+                area_hectares: field.area_hectares,
+                latitude: field.latitude,
+                longitude: field.longitude,
+              },
+            ]
+          : [],
+      ),
+    [fields],
+  );
 
   const stats = useMemo(
     () => ({
@@ -132,6 +152,23 @@ export function CropsView({ farmId }: CropsViewProps) {
             <p className="mt-2 text-3xl font-semibold text-brand-forest-900">{stat.value}</p>
           </div>
         ))}
+      </section>
+
+      <section className="flex flex-col gap-6">
+        <div className="flex flex-col gap-2">
+          <h2 className="text-xl font-semibold text-brand-forest-900">{t.crops.mapTitle}</h2>
+          <p className="text-sm text-stone-600">{t.crops.mapSubtitle}</p>
+        </div>
+        {locatedParcels.length === 0 ? (
+          <Notice tone="info">{t.crops.mapEmpty}</Notice>
+        ) : (
+          <>
+            <p className="text-sm font-medium text-stone-700">
+              {t.crops.mapLocatedCount}: {locatedParcels.length}
+            </p>
+            <ParcelMap parcels={locatedParcels} picked={null} heightClassName="h-[28rem]" />
+          </>
+        )}
       </section>
 
       {actionError && <Notice tone="error">{actionError}</Notice>}

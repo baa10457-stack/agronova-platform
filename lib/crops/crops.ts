@@ -12,6 +12,8 @@ export type CropField = {
   location: string | null;
   soil_type: string | null;
   notes: string | null;
+  latitude: number | null;
+  longitude: number | null;
 };
 
 export type CropFieldInput = {
@@ -20,6 +22,8 @@ export type CropFieldInput = {
   location: string | null;
   soil_type: string | null;
   notes: string | null;
+  latitude: number | null;
+  longitude: number | null;
 };
 
 export type CropSeason = {
@@ -46,7 +50,7 @@ export type CropSeasonInput = {
   status: CropSeasonStatus;
 };
 
-const FIELD_COLUMNS = 'id, farm_id, name, area_hectares, location, soil_type, notes';
+const FIELD_COLUMNS = 'id, farm_id, name, area_hectares, location, soil_type, notes, latitude, longitude';
 const SEASON_COLUMNS =
   'id, farm_id, field_id, crop_name, variety, sowing_date, expected_harvest_date, harvest_date, actual_yield_tons, status';
 
@@ -70,6 +74,8 @@ function parseField(row: Row): CropField | null {
     location: asString(row.location),
     soil_type: asString(row.soil_type),
     notes: asString(row.notes),
+    latitude: toNumber(row.latitude),
+    longitude: toNumber(row.longitude),
   };
 }
 

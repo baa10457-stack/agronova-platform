@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
+import { ParcelMap } from '@/components/crops/ParcelMap';
+import type { MapParcel, MapPoint } from '@/components/crops/LeafletParcelMap';
 import { Button } from '@/components/ui/Button';
 import { FormField } from '@/components/ui/FormField';
 import { Notice } from '@/components/ui/Notice';
@@ -16,10 +18,35 @@ type FieldFormDialogProps = {
 };
 
 const MAX_AREA = 100000;
+const COORDINATE_PRECISION = 6;
+const NO_PARCELS: MapParcel[] = [];
 
 function optional(value: string): string | null {
   const trimmed = value.trim();
   return trimmed === '' ? null : trimmed;
+}
+
+function parseDecimal(value: string): number {
+  return Number(value.trim().replace(',', '.'));
+}
+
+function inRange(value: number, limit: number): boolean {
+  return Number.isFinite(value) && Math.abs(value) <= limit;
+}
+
+function parseLocation(latitudeText: string, longitudeText: string): MapPoint | null | 'invalid' {
+  const hasLatitude = latitudeText.trim() !== '';
+  const hasLongitude = longitudeText.trim() !== '';
+  if (!hasLatitude && !hasLongitude) return null;
+  if (!hasLatitude || !hasLongitude) return 'invalid';
+  const latitude = parseDecimal(latitudeText);
+  const longitude = parseDecimal(longitudeText);
+  if (!inRange(latitude, 90) || !inRange(longitude, 180)) return 'invalid';
+  return { latitude, longitude };
+}
+
+function formatCoordinate(value: number): string {
+  return value.toFixed(COORDINATE_PRECISION);
 }
 
 export function FieldFormDialog({ farmId, field, onClose, onSaved }: FieldFormDialogProps) {
@@ -29,19 +56,40 @@ export function FieldFormDialog({ farmId, field, onClose, onSaved }: FieldFormDi
   const [location, setLocation] = useState(field?.location ?? '');
   const [soilType, setSoilType] = useState(field?.soil_type ?? '');
   const [notes, setNotes] = useState(field?.notes ?? '');
+  const [latitude, setLatitude] = useState(field?.latitude != null ? formatCoordinate(field.latitude) : '');
+  const [longitude, setLongitude] = useState(field?.longitude != null ? formatCoordinate(field.longitude) : '');
   const [nameError, setNameError] = useState<string | null>(null);
   const [areaError, setAreaError] = useState<string | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+
+  const parsedLocation = parseLocation(latitude, longitude);
+  const pickedPoint = parsedLocation && parsedLocation !== 'invalid' ? parsedLocation : null;
+
+  const placeOnMap = (point: MapPoint) => {
+    setLatitude(formatCoordinate(point.latitude));
+    setLongitude(formatCoordinate(point.longitude));
+    setLocationError(null);
+  };
+
+  const clearLocation = () => {
+    setLatitude('');
+    setLongitude('');
+    setLocationError(null);
+  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
-    const surface = Number(area.trim().replace(',', '.'));
+    const surface = parseDecimal(area);
     const areaValid = area.trim() !== '' && Number.isFinite(surface) && surface > 0 && surface <= MAX_AREA;
+    const coordinates = parseLocation(latitude, longitude);
+    const locationValid = coordinates !== 'invalid';
     setNameError(name.trim() === '' ? t.common.required : null);
     setAreaError(areaValid ? null : t.crops.areaInvalid);
-    if (name.trim() === '' || !areaValid) return;
+    setLocationError(locationValid ? null : t.crops.coordinatesInvalid);
+    if (name.trim() === '' || !areaValid || !locationValid) return;
 
     const input: CropFieldInput = {
       name: name.trim(),
@@ -49,6 +97,8 @@ export function FieldFormDialog({ farmId, field, onClose, onSaved }: FieldFormDi
       location: optional(location),
       soil_type: optional(soilType),
       notes: optional(notes),
+      latitude: coordinates ? coordinates.latitude : null,
+      longitude: coordinates ? coordinates.longitude : null,
     };
 
     setPending(true);
@@ -71,7 +121,7 @@ export function FieldFormDialog({ farmId, field, onClose, onSaved }: FieldFormDi
       <form
         onSubmit={handleSubmit}
         noValidate
-        className="flex max-h-[90vh] w-full max-w-lg flex-col gap-6 overflow-y-auto rounded-2xl bg-white p-8 shadow-xl"
+        className="flex max-h-[90vh] w-full max-w-2xl flex-col gap-6 overflow-y-auto rounded-2xl bg-white p-8 shadow-xl"
       >
         <h2 className="text-xl font-semibold text-brand-forest-900">{field ? t.crops.fieldFormEdit : t.crops.fieldFormNew}</h2>
 
@@ -111,6 +161,45 @@ export function FieldFormDialog({ farmId, field, onClose, onSaved }: FieldFormDi
           maxLength={80}
           disabled={pending}
         />
+
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span className="text-sm font-medium text-brand-forest-900">{t.crops.mapTitle}</span>
+            {(latitude !== '' || longitude !== '') && (
+              <Button variant="secondary" className="px-4 py-2" onClick={clearLocation} disabled={pending}>
+                {t.crops.clearLocation}
+              </Button>
+            )}
+          </div>
+          <p className="text-xs text-stone-600">{t.crops.mapPickHint}</p>
+          <ParcelMap
+            parcels={NO_PARCELS}
+            picked={pickedPoint}
+            onPick={pending ? undefined : placeOnMap}
+            heightClassName="h-64"
+          />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FormField
+              id="field-latitude"
+              inputMode="decimal"
+              label={t.crops.latitude}
+              value={latitude}
+              onChange={(e) => setLatitude(e.target.value)}
+              error={locationError}
+              disabled={pending}
+            />
+            <FormField
+              id="field-longitude"
+              inputMode="decimal"
+              label={t.crops.longitude}
+              value={longitude}
+              onChange={(e) => setLongitude(e.target.value)}
+              disabled={pending}
+            />
+          </div>
+          <p className="text-xs text-stone-500">{t.crops.locationSourceNote}</p>
+        </div>
+
         <div className="flex flex-col gap-2">
           <label htmlFor="field-notes" className="text-sm font-medium text-brand-forest-900">
             {t.crops.notes}
