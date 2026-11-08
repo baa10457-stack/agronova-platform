@@ -7,7 +7,7 @@ import { FormField } from '@/components/ui/FormField';
 import { Notice } from '@/components/ui/Notice';
 import { useAppText } from '@/i18n/useAppText';
 import { toErrorKey, type ErrorKey } from '@/lib/errors';
-import { createSupabaseBrowserClient } from '@/lib/supabase/client';
+import { createSupabaseBrowserClient, isSupabaseConfigured } from '@/lib/supabase/client';
 import { AuthCard } from './AuthCard';
 
 type LinkState = 'checking' | 'valid' | 'invalid';
@@ -24,6 +24,10 @@ export function ResetPasswordForm() {
 
   useEffect(() => {
     let active = true;
+    if (!isSupabaseConfigured()) {
+      setLinkState('invalid');
+      return;
+    }
     createSupabaseBrowserClient()
       .auth.getSession()
       .then(({ data }) => {

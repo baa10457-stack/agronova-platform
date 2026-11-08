@@ -2,7 +2,7 @@
 
 import type { Session, User } from '@supabase/supabase-js';
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { createSupabaseBrowserClient } from '@/lib/supabase/client';
+import { createSupabaseBrowserClient, isSupabaseConfigured } from '@/lib/supabase/client';
 
 type AuthContextValue = {
   user: User | null;
@@ -21,12 +21,17 @@ function readProfileFromMetadata(user: User): { fullName: string; phone: string 
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const supabase = createSupabaseBrowserClient();
   const [user, setUser] = useState<User | null>(null);
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!isSupabaseConfigured()) {
+      console.error('Supabase public configuration is missing');
+      setLoading(false);
+      return;
+    }
+    const supabase = createSupabaseBrowserClient();
     let active = true;
 
     const applySession = (session: Session | null) => {
@@ -63,7 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       active = false;
       listener.subscription.unsubscribe();
     };
-  }, [supabase]);
+  }, []);
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -71,10 +76,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isPlatformAdmin,
       loading,
       signOut: async () => {
-        await supabase.auth.signOut();
+        if (isSupabaseConfigured()) await createSupabaseBrowserClient().auth.signOut();
       },
     }),
-    [user, isPlatformAdmin, loading, supabase],
+    [user, isPlatformAdmin, loading],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
