@@ -14,7 +14,7 @@ import { FarmCard } from './FarmCard';
 export function DashboardView() {
   const t = useAppText();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, avatarUrl } = useAuth();
 
   const [farms, setFarms] = useState<MyFarm[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -28,12 +28,7 @@ export function DashboardView() {
     user?.email?.split('@')[0] ||
     'Utilisateur';
 
-  const avatarUrl =
-    metadata.avatar_url ||
-    metadata.picture ||
-    metadata.photo_url;
-
-  const initials = displayName
+  const initials = String(displayName)
     .split(' ')
     .filter(Boolean)
     .slice(0, 2)
@@ -66,16 +61,12 @@ export function DashboardView() {
 
   return (
     <div className="flex flex-col gap-8">
-
       {/* ESPACE DE BIENVENUE */}
-
       <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-950 via-emerald-900 to-green-800 p-7 text-white shadow-xl sm:p-10">
-
         <div className="absolute -right-16 -top-20 h-64 w-64 rounded-full bg-white/5" />
         <div className="absolute -bottom-24 right-32 h-52 w-52 rounded-full bg-emerald-400/10" />
 
         <div className="relative z-10 flex flex-col justify-between gap-8 sm:flex-row sm:items-center">
-
           <div className="max-w-xl">
             <span className="inline-flex items-center rounded-full border border-white/20 bg-white/10 px-4 py-1.5 text-xs font-semibold tracking-wider text-emerald-100">
               AGRONOVA FARM
@@ -86,15 +77,13 @@ export function DashboardView() {
             </h1>
 
             <p className="mt-3 text-sm leading-relaxed text-emerald-100 sm:text-base">
-              Pilotez vos exploitations agricoles depuis un espace
-              intelligent, moderne et centralisé.
+              Pilotez vos exploitations agricoles depuis un espace intelligent,
+              moderne et centralisé.
             </p>
           </div>
 
-          {/* AVATAR UTILISATEUR */}
-
+          {/* PHOTO DE PROFIL */}
           <div className="flex items-center gap-4 rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-md">
-
             {avatarUrl ? (
               <img
                 src={avatarUrl}
@@ -112,19 +101,14 @@ export function DashboardView() {
               <p className="mt-1 text-xs text-emerald-100">
                 Membre AGRONOVA
               </p>
-              <p className="mt-1 text-xs text-white/70">
-                {user?.email}
-              </p>
+              <p className="mt-1 text-xs text-white/70">{user?.email}</p>
             </div>
-
           </div>
         </div>
       </section>
 
       {/* STATISTIQUES */}
-
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-
         <div className="group rounded-2xl border border-emerald-100 bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
           <div className="flex items-center justify-between">
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-100 text-emerald-800">
@@ -136,11 +120,9 @@ export function DashboardView() {
               Exploitations
             </span>
           </div>
-
           <p className="mt-5 text-3xl font-bold text-emerald-950">
             {farms === null ? '—' : farms.length}
           </p>
-
           <p className="mt-1 text-sm text-stone-500">
             Exploitations associées à votre compte
           </p>
@@ -157,11 +139,9 @@ export function DashboardView() {
               Espace personnel
             </span>
           </div>
-
           <p className="mt-5 text-xl font-bold text-blue-950">
             Gestion centralisée
           </p>
-
           <p className="mt-1 text-sm text-stone-500">
             Retrouvez vos espaces agricoles.
           </p>
@@ -178,24 +158,19 @@ export function DashboardView() {
               AGRONOVA
             </span>
           </div>
-
           <p className="mt-5 text-xl font-bold text-amber-950">
             Agriculture intelligente
           </p>
-
           <p className="mt-1 text-sm text-stone-500">
             Une plateforme au service de vos activités.
           </p>
         </div>
-
       </section>
 
       {/* ERREURS */}
-
       {loadError && (
         <div className="flex flex-col gap-4">
           <Notice tone="error">{loadError}</Notice>
-
           <Button
             variant="secondary"
             onClick={() => void refresh()}
@@ -207,26 +182,20 @@ export function DashboardView() {
       )}
 
       {/* CHARGEMENT */}
-
       {farms === null && !loadError && (
         <div className="rounded-2xl border border-stone-200 bg-white p-8">
-          <p className="text-sm text-stone-500">
-            {t.common.loading}
-          </p>
+          <p className="text-sm text-stone-500">{t.common.loading}</p>
         </div>
       )}
 
       {/* MES EXPLOITATIONS */}
-
       {farms !== null && (
         <section className="flex flex-col gap-6">
-
           <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
             <div>
               <h2 className="text-2xl font-bold text-emerald-950">
                 Mes exploitations
               </h2>
-
               <p className="mt-1 text-sm text-stone-500">
                 Gérez et consultez vos espaces agricoles.
               </p>
@@ -251,11 +220,9 @@ export function DashboardView() {
                   <path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </div>
-
               <h3 className="mt-5 text-lg font-bold text-emerald-950">
                 {t.dashboard.emptyTitle}
               </h3>
-
               <p className="mx-auto mt-2 max-w-md text-sm text-stone-600">
                 {t.dashboard.emptyText}
               </p>
@@ -265,10 +232,7 @@ export function DashboardView() {
           {farms.length > 0 && (
             <div className="grid gap-5">
               {farms.map((entry) => (
-                <FarmCard
-                  key={entry.membershipId}
-                  entry={entry}
-                />
+                <FarmCard key={entry.membershipId} entry={entry} />
               ))}
             </div>
           )}
@@ -284,24 +248,19 @@ export function DashboardView() {
               </Button>
             </div>
           )}
-
         </section>
       )}
 
       {/* CREATION D'EXPLOITATION */}
-
       {showCreateForm && (
         <section className="flex flex-col gap-6 rounded-3xl border border-emerald-100 bg-white p-6 shadow-lg sm:p-8">
-
           <div className="flex flex-col gap-2">
             <span className="text-xs font-bold uppercase tracking-widest text-emerald-700">
               AGRONOVA FARM
             </span>
-
             <h2 className="text-2xl font-bold text-emerald-950">
               {t.dashboard.createTitle}
             </h2>
-
             <p className="text-sm text-stone-600">
               {t.dashboard.createSubtitle}
             </p>
@@ -315,10 +274,8 @@ export function DashboardView() {
                 : undefined
             }
           />
-
         </section>
       )}
-
     </div>
   );
 }
