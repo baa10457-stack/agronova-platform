@@ -1,4 +1,3 @@
-```tsx
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
@@ -664,4 +663,4 @@ export function FarmPanorama360({ farmId, farmName }: Props) {
     </section>
   );
 }
-```
+
