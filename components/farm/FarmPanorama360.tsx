@@ -1,3 +1,4 @@
+```tsx
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
@@ -9,17 +10,18 @@ declare global {
       viewer: (
         container: HTMLElement,
         config: Record<string, unknown>
-      ) => {
-        destroy: () => void;
-      };
+      ) => { destroy: () => void };
     };
+    L?: any;
   }
 }
 
-type FarmPanorama360Props = {
+type Props = {
   farmId: string;
   farmName: string;
 };
+
+const BUCKET = 'farm-panoramas';
 
 const PANNELLUM_CSS =
   'https://cdn.jsdelivr.net/npm/pannellum@2.5.7/build/pannellum.css';
@@ -27,67 +29,140 @@ const PANNELLUM_CSS =
 const PANNELLUM_JS =
   'https://cdn.jsdelivr.net/npm/pannellum@2.5.7/build/pannellum.js';
 
-const BUCKET = 'farm-panoramas';
+const LEAFLET_CSS =
+  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
 
-export function FarmPanorama360({
-  farmId,
-  farmName,
-}: FarmPanorama360Props) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const viewerRef = useRef<{ destroy: () => void } | null>(null);
+const LEAFLET_JS =
+  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+
+type Coordinates = {
+  latitude: number;
+  longitude: number;
+};
+
+function loadCss(id: string, href: string) {
+  if (document.getElementById(id)) return;
+
+  const link = document.createElement('link');
+  link.id = id;
+  link.rel = 'stylesheet';
+  link.href = href;
+  document.head.appendChild(link);
+}
+
+function loadScript(id: string, src: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const existing = document.getElementById(id) as HTMLScriptElement | null;
+
+    if (existing) {
+      const globalName = id === 'leaflet-js' ? 'L' : 'pannellum';
+
+      if ((window as any)[globalName]) {
+        resolve();
+        return;
+      }
+
+      existing.addEventListener('load', () => resolve(), { once: true });
+      existing.addEventListener('error', () => reject(), { once: true });
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.id = id;
+    script.src = src;
+    script.onload = () => resolve();
+    script.onerror = () => reject(
+      new Error('Impossible de charger une bibliothèque cartographique.')
+    );
+
+    document.body.appendChild(script);
+  });
+}
+
+export function FarmPanorama360({ farmId, farmName }: Props) {
+  const panoramaContainer = useRef<HTMLDivElement>(null);
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const viewerRef = useRef<any>(null);
+  const mapRef = useRef<any>(null);
+  const markerRef = useRef<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [mode, setMode] = useState<'satellite' | '360'>('satellite');
 
   const [panoramaUrl, setPanoramaUrl] = useState<string | null>(null);
   const [imagePath, setImagePath] = useState<string | null>(null);
-  const [ready, setReady] = useState(false);
+
+  const [coordinates, setCoordinates] = useState<Coordinates | null>(null);
+  const [savedCoordinates, setSavedCoordinates] =
+    useState<Coordinates | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [savingLocation, setSavingLocation] = useState(false);
+  const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mapReady, setMapReady] = useState(false);
 
-  // Charger le panorama enregistré dans Supabase
+  // Charger les données de l'exploitation
   useEffect(() => {
     let cancelled = false;
 
-    async function loadPanorama() {
+    async function loadData() {
       setLoading(true);
       setError(null);
 
       try {
         const supabase = createSupabaseBrowserClient();
 
-        const { data, error: dbError } = await supabase
-          .from('farm_panoramas')
-          .select('image_path')
-          .eq('farm_id', farmId)
-          .maybeSingle();
+        const [panoramaResult, locationResult] = await Promise.all([
+          supabase
+            .from('farm_panoramas')
+            .select('image_path')
+            .eq('farm_id', farmId)
+            .maybeSingle(),
 
-        if (dbError) throw dbError;
+          supabase
+            .from('farm_locations')
+            .select('latitude, longitude')
+            .eq('farm_id', farmId)
+            .maybeSingle(),
+        ]);
 
-        if (!data) {
+        if (panoramaResult.error) throw panoramaResult.error;
+        if (locationResult.error) throw locationResult.error;
+
+        if (cancelled) return;
+
+        if (panoramaResult.data) {
+          const path = panoramaResult.data.image_path;
+
+          const { data, error: signedError } = await supabase.storage
+            .from(BUCKET)
+            .createSignedUrl(path, 3600);
+
+          if (signedError) throw signedError;
+
           if (!cancelled) {
-            setImagePath(null);
-            setPanoramaUrl(null);
+            setImagePath(path);
+            setPanoramaUrl(data.signedUrl);
           }
-          return;
         }
 
-        const { data: signedData, error: signedError } =
-          await supabase.storage
-            .from(BUCKET)
-            .createSignedUrl(data.image_path, 3600);
+        if (locationResult.data) {
+          const position = {
+            latitude: locationResult.data.latitude,
+            longitude: locationResult.data.longitude,
+          };
 
-        if (signedError) throw signedError;
-
-        if (!cancelled) {
-          setImagePath(data.image_path);
-          setPanoramaUrl(signedData.signedUrl);
+          setCoordinates(position);
+          setSavedCoordinates(position);
         }
       } catch (err) {
         if (!cancelled) {
           setError(
             err instanceof Error
               ? err.message
-              : 'Impossible de charger le panorama.'
+              : 'Impossible de charger les données.'
           );
         }
       } finally {
@@ -95,61 +170,123 @@ export function FarmPanorama360({
       }
     }
 
-    loadPanorama();
+    loadData();
 
     return () => {
       cancelled = true;
     };
   }, [farmId]);
 
-  // Charger le moteur Pannellum
+  // Initialiser la carte satellite
   useEffect(() => {
-    if (!panoramaUrl || !containerRef.current) return;
+    if (mode !== 'satellite' || loading || !mapContainer.current) return;
 
     let cancelled = false;
 
-    const initialize = async () => {
+    async function initializeMap() {
+      try {
+        loadCss('leaflet-css', LEAFLET_CSS);
+        await loadScript('leaflet-js', LEAFLET_JS);
+
+        if (cancelled || !mapContainer.current || !window.L) return;
+
+        const L = window.L;
+
+        if (!mapRef.current) {
+          const center = coordinates
+            ? [coordinates.latitude, coordinates.longitude]
+            : [14.5, -14.5];
+
+          const map = L.map(mapContainer.current).setView(center, coordinates ? 16 : 6);
+
+          L.tileLayer(
+            'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+            {
+              attribution:
+                'Tiles © Esri — Sources: Esri, Maxar, Earthstar Geographics',
+              maxZoom: 19,
+            }
+          ).addTo(map);
+
+          map.on('click', (event: any) => {
+            const position = {
+              latitude: event.latlng.lat,
+              longitude: event.latlng.lng,
+            };
+
+            setCoordinates(position);
+
+            if (markerRef.current) {
+              markerRef.current.setLatLng(event.latlng);
+            } else {
+              markerRef.current = L.marker(event.latlng).addTo(map);
+            }
+          });
+
+          mapRef.current = map;
+
+          if (coordinates) {
+            markerRef.current = L.marker(center).addTo(map);
+          }
+        } else {
+          mapRef.current.invalidateSize();
+
+          if (coordinates) {
+            const position = [
+              coordinates.latitude,
+              coordinates.longitude,
+            ];
+
+            mapRef.current.setView(position, 16);
+
+            if (markerRef.current) {
+              markerRef.current.setLatLng(position);
+            } else {
+              markerRef.current = L.marker(position).addTo(mapRef.current);
+            }
+          }
+        }
+
+        setMapReady(true);
+      } catch (err) {
+        if (!cancelled) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : 'Impossible de charger la carte satellite.'
+          );
+        }
+      }
+    }
+
+    initializeMap();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, loading, coordinates?.latitude, coordinates?.longitude]);
+
+  // Initialiser la vue panoramique 360°
+  useEffect(() => {
+    if (mode !== '360' || !panoramaUrl || !panoramaContainer.current) return;
+
+    let cancelled = false;
+
+    async function initializePanorama() {
       try {
         setReady(false);
 
-        if (!document.querySelector('#pannellum-css')) {
-          const link = document.createElement('link');
-          link.id = 'pannellum-css';
-          link.rel = 'stylesheet';
-          link.href = PANNELLUM_CSS;
-          document.head.appendChild(link);
-        }
+        loadCss('pannellum-css', PANNELLUM_CSS);
+        await loadScript('pannellum-js', PANNELLUM_JS);
 
-        if (!window.pannellum) {
-          await new Promise<void>((resolve, reject) => {
-            let script =
-              document.querySelector<HTMLScriptElement>('#pannellum-js');
-
-            if (script) {
-              script.addEventListener('load', () => resolve(), { once: true });
-              script.addEventListener('error', () => reject(), { once: true });
-
-              if (window.pannellum) resolve();
-              return;
-            }
-
-            script = document.createElement('script');
-            script.id = 'pannellum-js';
-            script.src = PANNELLUM_JS;
-            script.onload = () => resolve();
-            script.onerror = () => reject();
-            document.body.appendChild(script);
-          });
-        }
-
-        if (cancelled || !containerRef.current || !window.pannellum) {
+        if (cancelled || !panoramaContainer.current || !window.pannellum) {
           return;
         }
 
         viewerRef.current?.destroy();
 
         viewerRef.current = window.pannellum.viewer(
-          containerRef.current,
+          panoramaContainer.current,
           {
             type: 'equirectangular',
             panorama: panoramaUrl,
@@ -172,30 +309,67 @@ export function FarmPanorama360({
         setReady(true);
       } catch {
         if (!cancelled) {
-          setError('Impossible de charger le moteur panoramique 360°.');
+          setError('Impossible de charger la vue panoramique 360°.');
         }
       }
-    };
+    }
 
-    initialize();
+    initializePanorama();
 
     return () => {
       cancelled = true;
       viewerRef.current?.destroy();
       viewerRef.current = null;
     };
-  }, [panoramaUrl, farmName]);
+  }, [mode, panoramaUrl, farmName]);
 
-  // Importer et enregistrer une nouvelle image
-  async function handleUpload(
-    event: React.ChangeEvent<HTMLInputElement>
-  ) {
+  // Enregistrer la position GPS choisie sur la carte
+  async function saveLocation() {
+    if (!coordinates) {
+      setError('Clique d’abord sur la carte pour choisir la position.');
+      return;
+    }
+
+    setSavingLocation(true);
+    setError(null);
+
+    try {
+      const supabase = createSupabaseBrowserClient();
+
+      const { error } = await supabase
+        .from('farm_locations')
+        .upsert(
+          {
+            farm_id: farmId,
+            latitude: coordinates.latitude,
+            longitude: coordinates.longitude,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'farm_id' }
+        );
+
+      if (error) throw error;
+
+      setSavedCoordinates(coordinates);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Impossible d’enregistrer la position.'
+      );
+    } finally {
+      setSavingLocation(false);
+    }
+  }
+
+  // Importer une image panoramique
+  async function handleUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
 
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
-      setError('Choisis un fichier image valide.');
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setError('Choisis une image JPEG, PNG ou WebP.');
       return;
     }
 
@@ -204,7 +378,6 @@ export function FarmPanorama360({
 
     try {
       const supabase = createSupabaseBrowserClient();
-
       const extension = file.name.split('.').pop() || 'jpg';
       const path = `${farmId}/${Date.now()}.${extension}`;
 
@@ -241,7 +414,7 @@ export function FarmPanorama360({
 
       setImagePath(path);
       setPanoramaUrl(data.signedUrl);
-      setReady(false);
+      setMode('360');
     } catch (err) {
       setError(
         err instanceof Error
@@ -258,7 +431,7 @@ export function FarmPanorama360({
   }
 
   // Supprimer le panorama
-  async function handleDelete() {
+  async function deletePanorama() {
     if (!imagePath) return;
 
     if (!window.confirm('Supprimer le panorama de cette exploitation ?')) {
@@ -297,89 +470,177 @@ export function FarmPanorama360({
 
   return (
     <section className="overflow-hidden rounded-2xl border border-brand-forest-100 bg-white shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-brand-forest-100 p-6">
-        <div>
-          <span className="text-xs font-bold uppercase tracking-widest text-brand-forest-600">
-            AGRONOVA IMMERSIVE
-          </span>
 
-          <h2 className="mt-2 text-xl font-semibold text-brand-forest-900">
-            Exploration panoramique 360°
-          </h2>
-
-          <p className="mt-1 text-sm text-stone-500">
-            Explorez votre exploitation agricole en immersion.
-          </p>
-        </div>
-
-        <span className="rounded-full bg-brand-forest-50 px-3 py-2 text-xs font-semibold text-brand-forest-800">
-          ● Vue 360°
+      <div className="border-b border-brand-forest-100 p-6">
+        <span className="text-xs font-bold uppercase tracking-widest text-brand-forest-600">
+          AGRONOVA IMMERSIVE
         </span>
-      </div>
 
-      {loading ? (
-        <div className="flex h-[300px] items-center justify-center text-sm text-stone-500">
-          Chargement du panorama...
-        </div>
-      ) : panoramaUrl ? (
-        <div>
-          <div className="relative">
-            {!ready && (
-              <div className="flex h-[350px] items-center justify-center text-sm text-stone-500">
-                Préparation de la vue immersive...
-              </div>
-            )}
+        <h2 className="mt-2 text-xl font-semibold text-brand-forest-900">
+          Exploration de votre exploitation
+        </h2>
 
-            <div
-              ref={containerRef}
-              className="h-[350px] w-full sm:h-[500px]"
-              aria-label={`Vue panoramique de ${farmName}`}
-            />
-          </div>
+        <p className="mt-1 text-sm text-stone-500">
+          Découvrez votre ferme depuis le ciel ou en immersion panoramique.
+        </p>
 
-          <div className="flex flex-wrap gap-3 p-5">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-              className="rounded-xl bg-brand-forest-700 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"
-            >
-              {uploading ? 'Envoi en cours...' : 'Changer le panorama'}
-            </button>
-
-            <button
-              type="button"
-              onClick={handleDelete}
-              className="rounded-xl border border-red-200 px-5 py-3 text-sm font-semibold text-red-600"
-            >
-              Supprimer
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="flex min-h-[300px] flex-col items-center justify-center bg-brand-forest-50/50 p-8 text-center">
-          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-brand-forest-100 text-3xl">
-            🌍
-          </div>
-
-          <h3 className="text-lg font-semibold text-brand-forest-900">
-            Votre exploitation en 360°
-          </h3>
-
-          <p className="mt-2 max-w-md text-sm leading-6 text-stone-600">
-            Importez une photographie panoramique 360° pour commencer
-            l'exploration immersive de votre exploitation.
-          </p>
+        <div className="mt-5 flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={() => setMode('satellite')}
+            className={`rounded-xl px-5 py-3 text-sm font-semibold ${
+              mode === 'satellite'
+                ? 'bg-brand-forest-700 text-white'
+                : 'border border-brand-forest-200 text-brand-forest-800'
+            }`}
+          >
+            🛰️ Vue satellite
+          </button>
 
           <button
             type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            className="mt-5 rounded-xl bg-brand-forest-700 px-6 py-3 text-sm font-semibold text-white disabled:opacity-50"
+            onClick={() => setMode('360')}
+            className={`rounded-xl px-5 py-3 text-sm font-semibold ${
+              mode === '360'
+                ? 'bg-brand-forest-700 text-white'
+                : 'border border-brand-forest-200 text-brand-forest-800'
+            }`}
           >
-            {uploading ? 'Envoi en cours...' : 'Importer un panorama 360°'}
+            🌍 Vue immersive 360°
           </button>
         </div>
+      </div>
+
+      {loading ? (
+        <div className="flex h-[350px] items-center justify-center text-sm text-stone-500">
+          Chargement de votre exploitation...
+        </div>
+      ) : (
+        <>
+          {mode === 'satellite' && (
+            <div>
+              <div
+                ref={mapContainer}
+                className="h-[400px] w-full sm:h-[550px]"
+                aria-label={`Carte satellite de ${farmName}`}
+              />
+
+              {!mapReady && (
+                <p className="p-4 text-sm text-stone-500">
+                  Chargement de la carte satellite...
+                </p>
+              )}
+
+              <div className="space-y-3 p-5">
+                <h3 className="font-semibold text-brand-forest-900">
+                  Position géographique de l'exploitation
+                </h3>
+
+                <p className="text-sm text-stone-600">
+                  Clique directement sur la carte pour placer le repère de
+                  ton exploitation.
+                </p>
+
+                {coordinates ? (
+                  <div className="rounded-xl bg-brand-forest-50 p-4 text-sm text-brand-forest-900">
+                    <p>
+                      Latitude : {coordinates.latitude.toFixed(6)}
+                    </p>
+                    <p>
+                      Longitude : {coordinates.longitude.toFixed(6)}
+                    </p>
+
+                    {savedCoordinates &&
+                      savedCoordinates.latitude === coordinates.latitude &&
+                      savedCoordinates.longitude === coordinates.longitude && (
+                        <p className="mt-2 font-semibold text-green-700">
+                          ✓ Position enregistrée
+                        </p>
+                      )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-stone-500">
+                    Aucune position sélectionnée.
+                  </p>
+                )}
+
+                <button
+                  type="button"
+                  onClick={saveLocation}
+                  disabled={!coordinates || savingLocation}
+                  className="rounded-xl bg-brand-forest-700 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"
+                >
+                  {savingLocation
+                    ? 'Enregistrement...'
+                    : 'Enregistrer la position'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {mode === '360' && (
+            <div>
+              {panoramaUrl ? (
+                <>
+                  <div className="relative">
+                    {!ready && (
+                      <div className="flex h-[350px] items-center justify-center text-sm text-stone-500">
+                        Préparation de la vue immersive...
+                      </div>
+                    )}
+
+                    <div
+                      ref={panoramaContainer}
+                      className="h-[350px] w-full sm:h-[500px]"
+                      aria-label={`Vue panoramique de ${farmName}`}
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap gap-3 p-5">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading}
+                      className="rounded-xl bg-brand-forest-700 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"
+                    >
+                      Changer le panorama
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={deletePanorama}
+                      className="rounded-xl border border-red-200 px-5 py-3 text-sm font-semibold text-red-600"
+                    >
+                      Supprimer
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="flex min-h-[350px] flex-col items-center justify-center bg-brand-forest-50/50 p-8 text-center">
+                  <div className="mb-4 text-5xl">🌍</div>
+
+                  <h3 className="text-lg font-semibold text-brand-forest-900">
+                    Votre exploitation en 360°
+                  </h3>
+
+                  <p className="mt-2 max-w-md text-sm leading-6 text-stone-600">
+                    Importez une photographie panoramique équirectangulaire
+                    pour explorer votre exploitation en immersion.
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                    className="mt-5 rounded-xl bg-brand-forest-700 px-6 py-3 text-sm font-semibold text-white disabled:opacity-50"
+                  >
+                    {uploading ? 'Envoi en cours...' : 'Importer un panorama 360°'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
 
       <input
@@ -397,9 +658,10 @@ export function FarmPanorama360({
       )}
 
       <div className="px-5 pb-5 text-xs text-stone-500">
-        Pour une véritable immersion, utilisez une image panoramique
-        équirectangulaire au format 2:1.
+        La carte satellite utilise l'imagerie Esri. La vue 360° nécessite
+        une image panoramique compatible au format 2:1.
       </div>
     </section>
   );
 }
+```
