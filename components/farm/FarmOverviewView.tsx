@@ -124,7 +124,7 @@ export function FarmOverviewView({ farmId }: FarmOverviewViewProps) {
           </div>
         </div>
       </section>
-<FarmPanorama360 farmName={farm.name} />
+<FarmPanorama360 farmId={farm.id} farmName={farm.name} />
       <section className="grid gap-5 sm:grid-cols-2">
         <div className="rounded-2xl border border-brand-forest-100 bg-white p-6 shadow-sm">
           <p className="text-sm font-medium text-stone-500">{t.overview.membersCount}</p>
